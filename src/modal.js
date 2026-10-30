@@ -97,6 +97,10 @@ export function openCountry(c) {
   dialog.scrollTop = 0;
 }
 
+export function closeCountry() {
+  if (dialog.open) dialog.close();
+}
+
 export function onClose(fn) {
   dialog.addEventListener("close", fn);
 }

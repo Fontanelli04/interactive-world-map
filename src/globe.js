@@ -27,10 +27,25 @@ function variation(id) {
   return ((h % 7) - 3) * 0.04;
 }
 
+// 0 before `from`, 1 after `to`, eased in between.
+function smoothstep(from, to, t) {
+  const x = Math.min(Math.max((t - from) / (to - from), 0), 1);
+  return x * x * (3 - 2 * x);
+}
+
+const SPIN_TURNS = 4;
+const SPIN_DURATION = 6000;
+const SPIN_ALTITUDE = 2.9;
+const LANDING_ALTITUDE = 1.5;
+
 export function createGlobe(element, { shapes, countries, onSelect }) {
   const byId = new Map(countries.map((c) => [c.id, c]));
   const colorOf = (id) => REGION_COLORS[byId.get(id)?.region] ?? UNCLICKABLE;
   let hovered = null;
+  let selectedId = null;
+  const isRaised = (f) => f === hovered || (selectedId && f.properties.id === selectedId);
+  const refreshPolygons = () =>
+    globe.polygonCapColor(globe.polygonCapColor()).polygonAltitude(globe.polygonAltitude());
 
   const globe = new Globe(element)
     .backgroundColor("#0b1626")
@@ -42,17 +57,17 @@ export function createGlobe(element, { shapes, countries, onSelect }) {
     .polygonCapColor((f) => {
       const id = f.properties.id;
       if (!id) return UNCLICKABLE;
-      return f === hovered ? shade(colorOf(id), 0.45) : shade(colorOf(id), variation(id));
+      return isRaised(f) ? shade(colorOf(id), 0.45) : shade(colorOf(id), variation(id));
     })
     .polygonSideColor(() => "rgba(0, 0, 0, 0.15)")
     .polygonStrokeColor(() => BORDER)
-    .polygonAltitude((f) => (f === hovered ? 0.02 : 0.006))
+    .polygonAltitude((f) => (isRaised(f) ? 0.02 : 0.006))
     .polygonsTransitionDuration(150)
     .polygonLabel((f) => f.properties.name)
     .onPolygonHover((f) => {
       hovered = f?.properties.id ? f : null;
       element.style.cursor = hovered ? "pointer" : "grab";
-      globe.polygonCapColor(globe.polygonCapColor()).polygonAltitude(globe.polygonAltitude());
+      refreshPolygons();
     })
     .onPolygonClick((f) => f.properties.id && onSelect(f.properties.id))
     // Dots for micro-states and territories without a shape of their own
@@ -82,12 +97,60 @@ export function createGlobe(element, { shapes, countries, onSelect }) {
   window.addEventListener("resize", resize);
   resize();
 
+  const setSelected = (id) => {
+    selectedId = id;
+    refreshPolygons();
+  };
+
   return {
+    setSelected,
+
     flyTo(id) {
       const c = byId.get(id);
       if (!c?.latlng) return;
       controls.autoRotate = false;
+      setSelected(id);
       globe.pointOfView({ lat: c.latlng[0], lng: c.latlng[1], altitude: 1.6 }, 1000);
+    },
+
+    // Roulette-style spin: whirl the globe several turns, slow down, and settle on the country.
+    spinTo(id) {
+      const c = byId.get(id);
+      if (!c?.latlng) return Promise.resolve();
+      const [lat, lng] = c.latlng;
+
+      setSelected(null);
+      controls.autoRotate = false;
+      controls.enabled = false;
+      const start = globe.pointOfView();
+      // Rotate eastward and land exactly on the target longitude after a few full turns.
+      const lngTravel = (((lng - start.lng) % 360) + 360) % 360 + 360 * SPIN_TURNS;
+
+      return new Promise((resolve) => {
+        const t0 = performance.now();
+        const frame = (now) => {
+          const t = Math.min((now - t0) / SPIN_DURATION, 1);
+          const spin = 1 - Math.pow(1 - t, 4); // fast start, long slow finish
+          const rise = smoothstep(0, 0.15, t);
+          const land = smoothstep(0.55, 1, t);
+          globe.pointOfView({
+            lat: start.lat + (lat - start.lat) * smoothstep(0.35, 1, t),
+            lng: start.lng + lngTravel * spin,
+            altitude:
+              start.altitude +
+              (SPIN_ALTITUDE - start.altitude) * rise +
+              (LANDING_ALTITUDE - SPIN_ALTITUDE) * land,
+          });
+          if (t < 1) {
+            requestAnimationFrame(frame);
+          } else {
+            controls.enabled = true;
+            setSelected(id);
+            resolve();
+          }
+        };
+        requestAnimationFrame(frame);
+      });
     },
   };
 }
