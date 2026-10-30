@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive World Map</title>
+    <meta name="description" content="Explore the world on a 3D globe. Click any country to learn about its history, culture, politics and economy." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="globe"></div>
+
+    <header class="toolbar">
+      <h1>World Map</h1>
+      <input id="search" type="search" list="country-list" placeholder="Search a country or territory…" autocomplete="off" aria-label="Search a country or territory" />
+      <datalist id="country-list"></datalist>
+    </header>
+
+    <div id="loading" class="loading">Loading globe…</div>
+
+    <dialog id="country-dialog" aria-labelledby="country-name">
+      <button class="close" type="button" aria-label="Close">×</button>
+      <header class="country-header">
+        <img id="country-flag" alt="" />
+        <div>
+          <h2 id="country-name"></h2>
+          <p id="country-official"></p>
+          <p class="capital"><span>Capital</span> <strong id="country-capital"></strong></p>
+        </div>
+      </header>
+      <dl id="country-facts" class="facts"></dl>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="history" aria-selected="true">History</button>
+        <button role="tab" data-tab="culture" aria-selected="false">Culture</button>
+        <button role="tab" data-tab="politics" aria-selected="false">Politics</button>
+        <button role="tab" data-tab="economy" aria-selected="false">Economy</button>
+      </nav>
+      <article id="tab-panel" role="tabpanel"></article>
+      <p class="disclaimer">Texts are AI-generated summaries and may contain errors.</p>
+    </dialog>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
